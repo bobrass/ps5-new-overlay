@@ -1,27 +1,79 @@
-PS5_PAYLOAD_SDK ?= /opt/ps5-payload-sdk
+# PS5 Overlay Makefile
+# Builds the standalone PS5 Overlay (Payload + Injector) using ps5-payload-sdk
 
-CC  = $(PS5_PAYLOAD_SDK)/bin/prospero-clang
-CXX = $(PS5_PAYLOAD_SDK)/bin/prospero-clang++
+ifndef PS5_PAYLOAD_SDK
+    ifneq ($(wildcard /opt/ps5-payload-sdk/toolchain/prospero.mk),)
+        PS5_PAYLOAD_SDK := /opt/ps5-payload-sdk
+    else ifneq ($(wildcard $(HOME)/ps5-payload-sdk/toolchain/prospero.mk),)
+        PS5_PAYLOAD_SDK := $(HOME)/ps5-payload-sdk
+    else ifneq ($(wildcard /home/kus/ps5-payload-sdk/toolchain/prospero.mk),)
+        PS5_PAYLOAD_SDK := /home/kus/ps5-payload-sdk
+    endif
+endif
 
-CFLAGS   = -O2 -Wall -Wextra -fPIC -fPIE -march=znver2 -Iinclude -I$(PS5_PAYLOAD_SDK)/include -DPS5=1 -D__PS5__=1
-CXXFLAGS = $(CFLAGS) -std=c++20
-LDFLAGS  = -pie -Wl,--gc-sections -L$(PS5_PAYLOAD_SDK)/lib -lkernel_sys -lSceNotification -lSceLibcInternal -lSceSystemService -lSceSysmodule -lSceUserService
+PS5_HOST ?= ps5
+PS5_PORT ?= 9021
 
-SRCS = src/main.cpp src/monitor.cpp src/overlay_ui.cpp src/notify.cpp src/config.cpp
-OBJS = $(SRCS:.cpp=.o)
-TARGET = dist/ps5_overlay.elf
+ifdef PS5_PAYLOAD_SDK
+    include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
+else
+    $(error PS5_PAYLOAD_SDK is undefined)
+endif
 
-all: $(TARGET)
+BIN_DIR     := bin
+PAYLOAD_ELF := $(BIN_DIR)/overlay_payload.elf
+VERSION     ?= v0.0.18
+LOADER_ELF  := $(BIN_DIR)/ps5-overlay-kus_$(VERSION).elf
 
-$(TARGET): $(OBJS)
-	@mkdir -p dist
-	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
-	@echo "Built $@"
+# Flags
+PAYLOAD_CXXFLAGS := -target x86_64-sie-ps5 -march=znver2 -fPIC -fPIE -O2 -Wall -Werror \
+                    -Wno-unused-function -Wno-deprecated -Wno-unused-command-line-argument \
+                    -nostartfiles -Ipayload -Icommon
+LOADER_CFLAGS    := -target x86_64-sie-ps5 -O2 -Wall -Werror -Wno-unused-function \
+                    -Iloader -Icommon
 
-%.o: %.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+# Source files
+PAYLOAD_SRCS := payload/mono_runtime.cpp \
+                payload/main.cpp \
+                payload/config.cpp \
+                payload/web_server.cpp \
+                payload/payload_log.cpp \
+                common/nid.c
+
+LOADER_SRCS  := loader/main.c \
+                loader/proc.c \
+                loader/ucred.c \
+                loader/injector.c \
+                loader/pt.c \
+                loader/elfldr.c \
+                loader/notify.c \
+                loader/loader_log.c \
+                loader/embedded_payload.S
+
+.PHONY: all clean test deploy
+
+all: $(LOADER_ELF)
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
+# Step 1: Build the injected payload ELF
+$(PAYLOAD_ELF): $(PAYLOAD_SRCS) | $(BIN_DIR)
+	@echo "==> Building Overlay Payload ELF..."
+	$(CXX) $(PAYLOAD_CXXFLAGS) $^ -lkernel_sys -o $@
+
+# Step 2: Build the loader ELF (which embeds overlay_payload.elf via .incbin)
+$(LOADER_ELF): $(LOADER_SRCS) $(PAYLOAD_ELF) | $(BIN_DIR)
+	@echo "==> Building PS5 Overlay Loader ELF (embedding payload)..."
+	$(CC) $(LOADER_CFLAGS) $(LOADER_SRCS) -lkernel_sys -o $@
+	@echo "==> Build complete: $@"
 
 clean:
-	rm -rf $(OBJS) dist
+	@echo "==> Cleaning build artifacts..."
+	rm -rf $(BIN_DIR)/*.elf $(BIN_DIR)/*.o
 
-.PHONY: all clean
+test: deploy
+
+deploy: $(LOADER_ELF)
+	@echo "==> Deploying $(LOADER_ELF) to $(PS5_HOST):$(PS5_PORT)..."
+	$(PS5_DEPLOY) -h $(PS5_HOST) -p $(PS5_PORT) $(LOADER_ELF)

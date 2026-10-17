@@ -1,131 +1,149 @@
-# PS5 Hardware Overlay 🎮
+# PS5 Overlay (KUS Edition) 🎮⚡
 
-Легковесный автономный оверлей мониторинга температур и нагрузки для взломанной PlayStation 5 (поддержка FW 1.xx - 10.xx+).
+**PS5 In-Game Telemetry Overlay** — автономный, легковесный внутриигровой оверлей мониторинга производительности и системной телеметрии в реальном времени для **PlayStation 5 (Jailbreak)**.
 
-[English](#english) | [Русский](#русский)
-
----
-
-## Русский
-
-Специализированное легковесное решение для мониторинга аппаратных показателей PlayStation 5 в реальном времени. В отличие от громоздких наборов вроде onionHEN / etaHEN, данный проект сфокусирован **исключительно на функции оверлея**: он не содержит лишних инструментов, читов, FTP-серверов или тяжелых зависимостей и не рискует вызвать панику ядра на высоких прошивках (включая FW 10.20).
-
-### Основные возможности
-
-- ⚡ **Аппаратный счётчик кадров (FPS Counter)**: Замер реальной частоты вертикальной синхронизации и смены кадров дисплея через Display Controller Engine (`/dev/dce`) или секлок OnionHEN (`/system_tmp/fps_sample`).
-- 🖥️ **Нативный экранный оверлей (In-Game HUD)**: Настоящая полоса мониторинга, отрисовываемая прямо поверх игр через внедрение в `SceShellUI` (с активным `kstuff`).
-- 🎨 **Цветовая дифференциация метрик**:
-  - **FPS**: золотисто-жёлтый (`#FFEB3B`)
-  - **CPU**: зеленый (`#66FF66`)
-  - **GPU**: фиолетовый (`#B366FF`)
-  - **RAM**: оранжевый (`#FFB34D`)
-  - **FAN**: бирюзовый (`#33E0FF`)
-- 🔕 **Без спама уведомлениями**: Постоянно всплывающие тосты отключены по умолчанию, чтобы не мешать погружению в игру.
-- 🌡️ **Температура CPU & GPU (SoC)**: Прямое чтение сенсоров в реальном времени (°C).
-- 💾 **Использование RAM & VRAM**: Объем занятой системной и видеопамяти.
-- 🌀 **Обороты кулера (Fan Duty)**: Скорость вращения вентилятора в процентах.
-- ⚙️ **Гибкая конфигурация**: Настройка через файл `/data/ps5_overlay/config.ini`.
+Оверлей выводится поверх любых игр и системного меню SceShellUI через нативные UI-компоненты PlayStation PUI (Mono). Управление и тонкая кастомизация осуществляются через встроенный **веб-интерфейс** прямо с телефона или ПК.
 
 ---
 
-### Отображение в играх
+## ✨ Основные возможности
 
-- **Наэкранный HUD в играх (SceShellUI)**:
-  - Внедряется автоматически в системный процесс `SceShellUI`.
-  - В верхней части экрана во время любой игры отображается аккуратная полупрозрачная плашка с цветными показателями:
-    ```text
-    FPS: 60  |  CPU: 58°C  |  GPU: 61°C  |  RAM: 4.8 GB  |  FAN: 35%
-    ```
+* 📊 **12 параметров телеметрии в реальном времени**:
+  1. **FPS** — аппаратная частота кадров через счётчик флипов дисплейного контроллера `/dev/dce` (плюс программный fallback через хуки `SceVshAppSystem`).
+  2. **CPU** — температура ядер процессора AMD Zen 2 (`sceKernelGetCpuTemperature`).
+  3. **LOAD** — общая загрузка процессора в процентах, рассчитываемая на основе времени выполнения тредов.
+  4. **CCLK** — текущая частота ядер CPU в МГц (`sceKernelGetCpuCoreClock` / `sceKernelGetCpuFrequency`).
+  5. **GPU** — температура графического чипа SoC RDNA 2 (`sceKernelGetSocSensorTemperature`, channel 0).
+  6. **GCLK** — фактическая частота видеоядра GFXCLK в МГц (`sceKernelGetSocClock`).
+  7. **RAM** — использование системной оперативной памяти (`get_page_table_stats`).
+  8. **VRAM** — объем используемой видеопамяти графического ускорителя (`get_page_table_stats`).
+  9. **SSD** — температура накопителя в слоте M.2 NVMe через датчик контроллера SoC (`sceKernelGetSocSensorTemperature`, channel 2). Если слот пуст — отображается `N/A`.
+  10. **FAN** — текущая скорость вращения турбины охлаждения в процентах (`sceKernelGetCurrentFanDuty`).
+  11. **PWR** — энергопотребление кристалла SoC APU в Ваттах (`sceKernelGetSocPowerConsumption`).
+  12. **IP** — локальный IPv4-адрес консоли в сети.
+
+* 🌐 **Встроенная Web-панель управления (порт 8585)**:
+  * Доступна с любого устройства в локальной сети: `http://<IP_PS5>:8585`.
+  * **Живой предпросмотр (Live Preview)** HUD в окне браузера.
+  * **Сортировка и фильтрация**: включение/выключение любой метрики и изменение порядка отображения кнопками ▲ / ▼.
+  * **Цветовая палитра**: индивидуальный выбор HEX-цвета для каждого параметра телеметрии.
+  * **Позиционирование**: выбор расположения (Сверху / Снизу, Слева / По центру / Справа) и тонкая подстройка отступов по X и Y.
+  * **Внешний вид**: настройка размера шрифта, высоты полосы, цвета и прозрачности полупрозрачной подложки (фона).
+  * 🛑 **Горячая выгрузка (Unload)**: кнопка безопасного завершения оверлея и очистки памяти без необходимости перезагружать консоль.
+  * **Автосохранение**: все изменения сохраняются в конфигурационный файл `/data/overlay/config.ini` и автоматически подгружаются при старте.
+
+* 🚀 **Автономный Loader (All-In-One ELF)**:
+  * Единый исполняемый файл `ps5-overlay-kus_vX.X.X.elf`.
+  * Сам находит процесс `SceShellUI`, повышает привилегии (`escalate_process_caps`), выделяет удалённую память через `ptrace`, маппит пейлоад и запускает рабочий тред с корректным подключением к домену Mono (`mono_thread_attach`).
+  * Безопасное предварительное разрешение системных символов ядра перед инжектом исключает падения и зависания.
 
 ---
 
-### Быстрый старт
+## 🛠 Быстрый старт и использование
 
-#### Вариант 1: Запуск через ELF Loader (Port 9020 / 9021)
-После активации джейлбрейка отправьте скомпилированный `.elf` на консоль:
+### 1. Отправка на консоль
+Отправьте собранный ELF на консоль через Netcat / Socat на порт загрузчика пейлоадов (например, 9021 или 9020):
+
 ```bash
-# Через Netcat на порт 9020 (или 9021):
-nc -w 3 <IP_PS5> 9020 < ps5_overlay.elf
-```
-или воспользуйтесь любой программой для отправки пейлоадов (PS5 Payload Sender / Netcat GUI).
+# Через netcat
+nc -q0 192.168.1.100 9021 < bin/ps5-overlay-kus_v0.0.18.elf
 
-#### Вариант 2: Автозапуск через менеджер пейлоадов
-Скопируйте `ps5_overlay.elf` в директорию пейлоадов на консоли:
-```text
-/data/OnionHEN/payloads/ps5_overlay.elf
-# или
-/data/etaHEN/payloads/ps5_overlay.elf
+# Или через socat
+socat - TCP:192.168.1.100:9021 < bin/ps5-overlay-kus_v0.0.18.elf
 ```
-и включите автозапуск в меню консоли.
+
+После успешного внедрения на экране консоли появится уведомление:
+> **"PS5 Overlay Loaded successfully!"**
+
+### 2. Настройка через браузер
+Откройте в браузере смартфона или компьютера адрес:
+```
+http://<IP_ВАШЕЙ_PS5>:8585
+```
+*(Если порт 8585 занят, сервер автоматически выберет альтернативный порт: 8282, 8989 или 9876).*
 
 ---
 
-### Настройка (`config.ini`)
+## 🏗 Архитектура проекта
 
-Файл конфигурации можно разместить по пути:
-```text
-/data/ps5_overlay/config.ini
 ```
-Пример настроек (`config.ini.example`):
+PS5_Overlay/
+├── Makefile                 # Правила сборки payload и loader
+├── common/                  # Общие заголовки, структуры и NID
+│   ├── bootstrap.h          # Аргументы передачи указателей от Loader к Payload
+│   ├── log.h                # Макросы системного логирования
+│   └── nid.c                # Разрешение NID для libkernel_sys
+├── loader/                  # Загрузчик / Инжектор (ps5-overlay-kus.elf)
+│   ├── main.c               # Точка входа, поиск SceShellUI
+│   ├── injector.c           # Инжектор шеллкода и pre-resolving символов
+│   ├── proc.c               # Поиск PID процессов через sysctl
+│   ├── ucred.c              # Эскалация прав и привилегий (jailbreak_process)
+│   ├── pt.c                 # Обертки ptrace
+│   ├── elfldr.c             # Удаленный ELF-загрузчик
+│   ├── notify.c             # Вывод системных всплывающих уведомлений (toast)
+│   └── embedded_payload.S   # Секция встраивания overlay_payload.elf
+└── payload/                 # Полезная нагрузка (внедряется в SceShellUI)
+    ├── main.cpp             # Mono хуки, построение HUD, опрос телеметрии
+    ├── config.cpp / .hpp    # Парсер и генератор конфигурации INI (/data/overlay/config.ini)
+    ├── web_server.cpp       # Встроенный HTTP веб-сервер и REST API
+    ├── mono_runtime.cpp     # Взаимодействие с рантаймом Mono
+    └── payload_log.cpp      # Логирование пейлоада
+```
+
+---
+
+## ⚙️ Сборка из исходников
+
+Для сборки требуется окружение Linux с установленным **[ps5-payload-sdk](https://github.com/ps5-payload-dev/ps5-payload-sdk)**.
+
+```bash
+# Клонирование репозитория
+git clone https://github.com/username/PS5_Overlay.git
+cd PS5_Overlay
+
+# Сборка проекта
+make clean && make
+
+# Готовый файл появится в папке bin/:
+# bin/ps5-overlay-kus_v0.0.18.elf
+```
+
+---
+
+## 📝 Конфигурационный файл
+
+Все настройки сохраняются на консоли по пути `/data/overlay/config.ini`:
+
 ```ini
-[ps5_overlay]
+[overlay]
 enabled = true
-show_fps = true             ; Счётчик FPS (Hardware DCE / OnionHEN)
-show_cpu_temp = true        ; Температура CPU
-show_cpu_load = true        ; Загрузка CPU %
-show_all_cores = false      ; Нагрузка по ядрам
-show_gpu_temp = true        ; Температура GPU (SOC)
-show_gpu_load = true        ; Загрузка VRAM %
-show_ram = true             ; Использование RAM
-show_fan = true             ; Обороты кулера %
-interval_ms = 1000          ; Опрос сенсоров (мс)
+pos_v = top
+pos_h = left
+offset_x = 24
+offset_y = 0
+font_size = 18
+bar_height = 34
+bg_visible = true
+bg_color = #000000
+bg_opacity = 0.70
+port = 8585
 
-toast_notifications = false ; Экранный OSD в играх (true/false)
-toast_interval_sec = 10     ; Интервал обновления OSD (сек)
+[metrics]
+order = fps,cpu,load,cclk,gpu,gclk,ram,vram,ssd,fan,pwr,ip
+
+[metric_fps]
+enabled = true
+color = #FFEB3B
+
+[metric_ssd]
+enabled = true
+color = #00E5FF
+...
 ```
 
 ---
 
-<a name="english"></a>
-## English
-
-A lightweight, standalone hardware monitoring overlay for jailbroken PlayStation 5 consoles (FW 1.xx - 10.xx+).
-
-Unlike full HEN suites (like onionHEN or etaHEN), this project focuses **exclusively on the overlay experience**: minimal footprint, zero bloat, no cheats, and no risk of kernel panics on newer firmwares (including FW 10.20).
-
-### Features
-
-- ⚡ **Real-Time In-Game FPS Counter**: Accurate framerate monitoring sampled via Display Controller Engine (`/dev/dce`) hardware flip deltas or OnionHEN seqlock sampler (`/system_tmp/fps_sample`).
-- 🖥️ **Native In-Game HUD**: Translucent top-screen status bar rendered seamlessly over active gameplay via Mono PUI in `SceShellUI`.
-- 🌡️ **CPU Temperature**: Real-time reading of internal Zen 2 CPU sensors.
-- 🎯 **CPU Utilization**: Accurate CPU load percentage and 8-core tracks.
-- 🔥 **GPU / SoC Temperature**: APU / SoC thermal monitoring.
-- 🎮 **VRAM Usage**: Video memory usage percentage and MB.
-- 💾 **System RAM**: Memory footprint in GB and percentage (`4.8 / 16.0 GB`).
-- 🌀 **Fan Duty Cycle**: Real-time cooling fan speed percentage.
-- 🔕 **Zero Toast Spam**: Notification popups disabled by default to protect gameplay immersion.
-- ⚙️ **Configurable**: Managed via `/data/ps5_overlay/config.ini`.
-
----
-
-## Сборка и GitHub Releases
-
-Проект настроен для автоматической компиляции и выпуска релизов через **GitHub Actions**:
-
-1. **Автоматическая сборка**: При каждом коммите в ветку `main` GitHub Actions собирает `ps5_overlay.elf` с помощью актуального `ps5-payload-sdk` и сохраняет артефакты.
-2. **Публикация релиза**:
-   - При создании тега версии:
-     ```bash
-     git tag v1.0.1
-     git push origin v1.0.1
-     ```
-   - Или вручную через вкладку **Actions** -> **Build and Release PS5 Overlay** -> **Run workflow**.
-
-GitHub Action автоматически скомпилирует бинарный файл, сгенерирует `SHA256SUMS.txt` и прикрепит их к новому релизу в разделе **Releases**.
-
----
-
-## Лицензия
-
-Распространяется под лицензией MIT / GPLv3.
-Отдельная благодарность разработчикам `ps5-payload-dev`, `etaHEN` и сообществу сцены PS5.
+## 🤝 Благодарности
+* Разработчикам **ps5-payload-sdk**
+* Проектам **ProsperoMgr** и **ps5-hwinfo** за реверс-инжиниринг и исследования сенсоров PlayStation 5 SoC APU
+* Команде **OnionHEN** за базовые наработки интеграции с Mono PUI

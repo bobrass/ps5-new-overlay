@@ -19,9 +19,9 @@ on:
         type: boolean
         default: true
       release_version:
-        description: 'Release Tag/Version (e.g. v1.0.0)'
+        description: 'Release Tag/Version (e.g. v0.0.18)'
         required: false
-        default: 'v1.0.0'
+        default: 'v0.0.18'
 
 permissions:
   contents: write
@@ -41,7 +41,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            git wget unzip cmake ninja-build make \
+            git wget unzip make \
             clang-18 lld-18 llvm-18 llvm-18-dev \
             python3
 
@@ -61,33 +61,27 @@ jobs:
           echo "PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk" >> $GITHUB_ENV
           echo "LLVM_CONFIG=/usr/bin/llvm-config-18" >> $GITHUB_ENV
           echo "/opt/ps5-payload-sdk/bin" >> $GITHUB_PATH
-          test -x /opt/ps5-payload-sdk/bin/prospero-cmake
           test -x /opt/ps5-payload-sdk/bin/prospero-clang
 
-      - name: Build ps5_overlay.elf
+      - name: Build ps5-overlay ELF
         run: |
           export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
           export LLVM_CONFIG=/usr/bin/llvm-config-18
           export PATH="/opt/ps5-payload-sdk/bin:/usr/lib/llvm-18/bin:${PATH}"
 
-          mkdir -p build
-          cd build
-          prospero-cmake .. -DCMAKE_BUILD_TYPE=Release
-          cmake --build . --target ps5_overlay_shellui --verbose -j$(nproc)
+          TAG_OR_VER="v0.0.18"
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAG_OR_VER="${GITHUB_REF#refs/tags/}"
+          fi
 
-          # Embed the newly compiled shellui ELF into embedded_shellui.c
-          python3 ../tools/bin2c.py ps5_overlay_shellui.elf ../src/embedded_shellui.c g_overlay_shellui_elf
-
-          # Build the main overlay ELF with the embedded payload
-          cmake --build . --target ps5_overlay --verbose -j$(nproc)
-          cd ..
+          make clean
+          make VERSION="${TAG_OR_VER}"
 
           mkdir -p dist
-          cp build/ps5_overlay.elf dist/ps5_overlay.elf
-          cp build/ps5_overlay_shellui.elf dist/ps5_overlay_shellui.elf
+          cp bin/*.elf dist/
 
           cd dist
-          sha256sum ps5_overlay*.elf > SHA256SUMS.txt
+          sha256sum *.elf > SHA256SUMS.txt
           echo "=== SHA256 Checksums ==="
           cat SHA256SUMS.txt
 
@@ -96,8 +90,7 @@ jobs:
         with:
           name: ps5-overlay-build
           path: |
-            dist/ps5_overlay.elf
-            dist/ps5_overlay_shellui.elf
+            dist/*.elf
             dist/SHA256SUMS.txt
           if-no-files-found: warn
 
@@ -131,52 +124,42 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
-          name: PS5 Hardware Overlay ${{ steps.vars.outputs.tag }}
+          name: PS5 In-Game Overlay ${{ steps.vars.outputs.tag }}
           draft: false
           prerelease: false
           generate_release_notes: true
           body: |
-            ## 🎮 PS5 Hardware Overlay ${{ steps.vars.outputs.tag }}
-            
-            Lightweight, standalone in-game hardware monitoring overlay for jailbroken PlayStation 5 (FW 1.xx - 10.xx+, kstuff active).
-            
-            ### ✨ What's New in v1.0.15
-            - **🧹 Streamlined Architecture (Pure In-Game Overlay)**:
-              - Completely removed embedded HTTP web server, sockets, and heavy HTML template assets.
-              - Minimal footprint, zero background network listening, and maximum stability.
-            - **⚡ Real-Time In-Game FPS Counter**:
-              - Hardware scanout flip delta sampling via Display Controller Engine (`/dev/dce`, `ioctl 0x80308217`).
-              - Native fallback support for OnionHEN seqlock sampler (`/system_tmp/fps_sample`).
-              - Dedicated **FPS** badge in gold/yellow (`#FFEB3B`) with live framerate (`60` / `120` / `--`).
-              - Configurable via `show_fps = true` in `/data/ps5_overlay/config.ini`.
-            - **🖥️ Native On-Screen In-Game HUD**:
-              - Automatically injected into `SceShellUI` via `ptrace` (with `kstuff` active).
-              - Rendered directly on top of gameplay via Mono PUI (`Scene.RootWidget`).
-              - Sleek translucent 2D bar at top of screen with color-coded metrics:
-                - **FPS** (Gold/Yellow `#FFEB3B`)
-                - **CPU** (Green `#66FF66`)
-                - **GPU** (Purple `#B366FF`)
-                - **RAM** (Orange `#FFB34D`)
-                - **FAN** (Cyan `#33E0FF`)
-            - **🔕 Zero Toast Spam**:
-              - Recurring notification popups completely disabled to protect your gameplay immersion.
-              - Only a single silent startup toast confirms the overlay is loaded.
-            
+            ## 🎮 PS5 In-Game Overlay ${{ steps.vars.outputs.tag }}
+
+            Standalone in-game hardware telemetry overlay for jailbroken PlayStation 5 with real-time hardware monitoring and built-in Web configuration panel.
+
+            ### ✨ Features
+            - **12 Live Hardware Metrics**:
+              - **FPS**: Hardware Display Controller Engine scanout flip counter (`/dev/dce`)
+              - **CPU**: Zen 2 Tctl core temperature (°C)
+              - **LOAD**: CPU utilization (%)
+              - **CCLK**: Zen 2 CPU core frequencies in MHz
+              - **GPU**: AMD RDNA 2 SoC GPU temperature (°C)
+              - **GCLK**: RDNA 2 GFXCLK clock in MHz
+              - **RAM**: System memory usage (GB)
+              - **VRAM**: Video memory usage (GB)
+              - **SSD**: M.2 NVMe SSD expansion drive temperature (°C via SoC channel 2)
+              - **FAN**: Blower fan duty cycle (%)
+              - **PWR**: SoC APU power consumption in Watts
+              - **IP**: PlayStation 5 local IPv4 address
+            - **Web Configuration Panel (Port 8585)**:
+              - Full remote control via browser at `http://<PS5_IP>:8585`
+              - Live preview, reorder metrics, custom colors (HEX/Picker), position & offset adjustments
+              - Graceful overlay unloader to quit without restarting console
+            - **Persistent Config**: Automatically saved to `/data/overlay/config.ini`
+
             ### 🚀 Quick Start
-            1. Ensure **kstuff** is active on your PS5.
-            2. Send `ps5_overlay.elf` to your console via port **9020** or **9021**:
-               ```bash
-               nc -w 3 <ps5_ip> 9020 < ps5_overlay.elf
-               ```
-            3. A single notification appears confirming the overlay is active.
-            4. Launch any game — the hardware HUD bar appears at the top of the screen!
-            
-            ### 🔒 SHA-256 Checksums
-            Included in `SHA256SUMS.txt`.
+            Send the ELF binary to your jailbroken PS5 via port 9020 or 9021:
+            ```bash
+            nc -q0 <PS5_IP> 9021 < ps5-overlay-kus_${{ steps.vars.outputs.tag }}.elf
+            ```
           files: |
-            dist/ps5_overlay.elf
-            dist/ps5_overlay_shellui.elf
+            dist/*.elf
             dist/SHA256SUMS.txt
-            config.ini.example
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

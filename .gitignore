@@ -1,40 +1,12 @@
 # Build artifacts
-build/
-build-*/
-dist/
 bin/
-*.elf
-*.bin
+dist/
 *.o
-*.obj
-*.a
-*.so
-*.sprx
-*.d
+*.elf
 
-# CMake
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile.cmake
-compile_commands.json
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Dependencies
-.deps/
-ps5-payload-sdk/
-
-# Logs and system
+# Temp / Cache / Local references
+.cache/
 *.log
-.DS_Store
-Thumbs.db
-
-# Reference sources
-onionHEN*/
-
+onionHEN-main/
+sdk-master/
+ps5-new-overlay-main/
