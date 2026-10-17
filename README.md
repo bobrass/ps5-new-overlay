@@ -46,10 +46,10 @@
 
 ```bash
 # Через netcat
-nc -q0 192.168.1.100 9021 < bin/ps5-overlay-kus_v0.0.18.elf
+nc -q0 192.168.1.100 9021 < bin/ps5-overlay-kus_v1.0.18.elf
 
 # Или через socat
-socat - TCP:192.168.1.100:9021 < bin/ps5-overlay-kus_v0.0.18.elf
+socat - TCP:192.168.1.100:9021 < bin/ps5-overlay-kus_v1.0.18.elf
 ```
 
 После успешного внедрения на экране консоли появится уведомление:
@@ -105,7 +105,7 @@ cd PS5_Overlay
 make clean && make
 
 # Готовый файл появится в папке bin/:
-# bin/ps5-overlay-kus_v0.0.18.elf
+# bin/ps5-overlay-kus_v1.0.18.elf
 ```
 
 ---
