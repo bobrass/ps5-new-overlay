@@ -159,5 +159,3 @@ color = #00E5FF
 * The **ps5-payload-sdk** developers
 * **ProsperoMgr** and **ps5-hwinfo** projects for reverse engineering and researching PlayStation 5 SoC APU sensors
 * The **OnionHEN** team for baseline work on Mono PUI integration
-
-```
