@@ -1,7 +1,3 @@
-Вот готовое профессиональное описание для вашего GitHub-репозитория на двух языках (**English** и **Russian**). Вы можете просто скопировать этот текст и вставить его в файл `README.md`.
-
----
-
 # PS5 Overlay (KUS Edition) 🎮⚡
 
 [English](https://www.google.com/search?q=%23english) | [Русский](https://www.google.com/search?q=%23%D1%80%D1%83%D1%81%D1%81%D0%BA%D0%B8%D0%B9)
