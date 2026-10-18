@@ -46,10 +46,10 @@
 
 ```bash
 # Через netcat
-nc -q0 192.168.1.100 9021 < bin/ps5-overlay-kus_v1.0.18.elf
+nc -q0 192.168.1.100 9021 < bin/ps5-overlay-kus_v1.0.19.elf
 
 # Или через socat
-socat - TCP:192.168.1.100:9021 < bin/ps5-overlay-kus_v1.0.18.elf
+socat - TCP:192.168.1.100:9021 < bin/ps5-overlay-kus_v1.0.19.elf
 ```
 
 После успешного внедрения на экране консоли появится уведомление:
@@ -98,14 +98,14 @@ PS5_Overlay/
 
 ```bash
 # Клонирование репозитория
-git clone https://github.com/username/PS5_Overlay.git
-cd PS5_Overlay
+git clone https://github.com/smoxa/ps5-new-overlay.git
+cd ps5-new-overlay
 
 # Сборка проекта
 make clean && make
 
 # Готовый файл появится в папке bin/:
-# bin/ps5-overlay-kus_v1.0.18.elf
+# bin/ps5-overlay-kus_v1.0.19.elf
 ```
 
 ---

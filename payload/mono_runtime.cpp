@@ -399,21 +399,21 @@ void Patch_Main_thread_Check(MonoImage* core_img) {
     }
     LOG_INFO("CheckRunningOnMainThread address: 0x%lx", (unsigned long)real_addr);
 
-    uint64_t page_addr = real_addr & ~0x3FFFULL;
+    uint64_t page_addr = real_addr & ~0xFFFULL;
     int r = -1;
     if (sceKernelMprotect) {
-        r = sceKernelMprotect((void*)page_addr, 0x4000, 7); // PROT_READ | PROT_WRITE | PROT_EXEC
+        r = sceKernelMprotect((void*)page_addr, 0x1000, 7); // PROT_READ | PROT_WRITE | PROT_EXEC
     }
     if (r != 0) {
-        r = kernel_mprotect(getpid(), page_addr, 0x4000, 7);
+        r = kernel_mprotect(getpid(), page_addr, 0x1000, 7);
     }
 
     if (r == 0) {
         *(volatile uint8_t*)real_addr = 0xC3; // x86 'ret'
         if (sceKernelMprotect) {
-            sceKernelMprotect((void*)page_addr, 0x4000, 5); // PROT_READ | PROT_EXEC
+            sceKernelMprotect((void*)page_addr, 0x1000, 5); // PROT_READ | PROT_EXEC
         } else {
-            kernel_mprotect(getpid(), page_addr, 0x4000, 5);
+            kernel_mprotect(getpid(), page_addr, 0x1000, 5);
         }
         LOG_INFO("CheckRunningOnMainThread successfully patched with ret (0xC3)!");
     } else {

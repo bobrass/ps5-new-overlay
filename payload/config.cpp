@@ -11,6 +11,9 @@ extern "C" {
 #define SYS_write  4
 #define SYS_open   5
 #define SYS_close  6
+#define SYS_chmod  15
+#define SYS_fsync  95
+#define SYS_mkdir  136
 
 #define O_RDONLY   0x0000
 #define O_WRONLY   0x0001
@@ -222,8 +225,22 @@ bool config_load(OverlayConfig* cfg, const char* path) {
     if (!path) return false;
 
     long fd = __syscall(SYS_open, path, O_RDONLY, 0);
+    const char* loaded_path = path;
     if (fd < 0) {
-        LOG_INFO("Config file %s not found. Using defaults.", path);
+        fd = __syscall(SYS_open, "/data/ps5_overlay.ini", O_RDONLY, 0);
+        if (fd >= 0) {
+            loaded_path = "/data/ps5_overlay.ini";
+        }
+    }
+    if (fd < 0) {
+        fd = __syscall(SYS_open, "/user/data/overlay/config.ini", O_RDONLY, 0);
+        if (fd >= 0) {
+            loaded_path = "/user/data/overlay/config.ini";
+        }
+    }
+    if (fd < 0) {
+        LOG_INFO("Config file not found on disk. Creating initial default at %s...", path);
+        config_save(cfg, path);
         return false;
     }
 
@@ -373,12 +390,20 @@ bool config_load(OverlayConfig* cfg, const char* path) {
         }
     }
 
-    LOG_INFO("Config loaded successfully from %s", path);
+    LOG_INFO("Config loaded successfully from %s", loaded_path);
     return true;
 }
 
 bool config_save(const OverlayConfig* cfg, const char* path) {
     if (!cfg || !path) return false;
+
+    // Ensure all target directories exist
+    __syscall(SYS_mkdir, "/data", 0777);
+    __syscall(SYS_mkdir, "/data/overlay", 0777);
+    __syscall(SYS_chmod, "/data/overlay", 0777);
+    __syscall(SYS_mkdir, "/user/data", 0777);
+    __syscall(SYS_mkdir, "/user/data/overlay", 0777);
+    __syscall(SYS_chmod, "/user/data/overlay", 0777);
 
     char buf[2048];
     int len = 0;
@@ -430,12 +455,25 @@ bool config_save(const OverlayConfig* cfg, const char* path) {
     }
 
     long fd = __syscall(SYS_open, path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd < 0) {
+    if (fd >= 0) {
+        __syscall(SYS_write, fd, buf, len);
+        __syscall(SYS_fsync, fd);
+        __syscall(SYS_close, fd);
+        LOG_INFO("Config saved successfully to %s", path);
+    } else {
         LOG_ERROR("Failed to open %s for writing (fd=%ld)", path, fd);
-        return false;
     }
-    __syscall(SYS_write, fd, buf, len);
-    __syscall(SYS_close, fd);
-    LOG_INFO("Config saved successfully to %s", path);
-    return true;
+
+    // Mirror to /data/ps5_overlay.ini as a guaranteed root fallback
+    if (strcmp(path, "/data/ps5_overlay.ini") != 0) {
+        long mfd = __syscall(SYS_open, "/data/ps5_overlay.ini", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+        if (mfd >= 0) {
+            __syscall(SYS_write, mfd, buf, len);
+            __syscall(SYS_fsync, mfd);
+            __syscall(SYS_close, mfd);
+            LOG_INFO("Config mirror backup saved to /data/ps5_overlay.ini");
+        }
+    }
+
+    return (fd >= 0);
 }

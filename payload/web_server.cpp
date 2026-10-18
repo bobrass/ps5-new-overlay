@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <strings.h>
 #include <unistd.h>
 
 extern "C" {
@@ -503,7 +504,7 @@ input[type="range"]::-webkit-slider-thumb {
     </div>
     <div class="status-pill">
       <span class="status-dot"></span>
-      <span>PS5 ShellUI (v0.0.18)</span>
+      <span>PS5 ShellUI (v1.0.19)</span>
     </div>
   </div>
 
@@ -939,6 +940,12 @@ async function loadConfigFromServer() {
 }
 
 async function saveConfigToServer() {
+  const btn = document.getElementById('btnSave');
+  if (btn && btn.disabled) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Сохранение...';
+  }
   try {
     const res = await fetch('/api/config', {
       method: 'POST',
@@ -952,6 +959,13 @@ async function saveConfigToServer() {
     }
   } catch (err) {
     showToast('Ошибка сети при сохранении');
+  } finally {
+    if (btn) {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '💾 Сохранить и применить на PS5';
+      }, 600);
+    }
   }
 }
 
@@ -1296,8 +1310,10 @@ static void handle_client_http(long client_fd, const char* req, size_t req_len) 
         const char* body = strstr(req, "\r\n\r\n");
         if (body) {
             body += 4;
-            parse_config_json(body, &g_config);
-            config_save(&g_config, "/data/overlay/config.ini");
+            OverlayConfig new_cfg = g_config;
+            parse_config_json(body, &new_cfg);
+            config_save(&new_cfg, "/data/overlay/config.ini");
+            g_config = new_cfg;
             g_config_changed = true;
             LOG_INFO("Config updated via HTTP Web Settings and marked dirty!");
         }
@@ -1308,8 +1324,10 @@ static void handle_client_http(long client_fd, const char* req, size_t req_len) 
     }
 
     if (strncmp(req, "POST /api/reset", 15) == 0) {
-        config_set_defaults(&g_config);
-        config_save(&g_config, "/data/overlay/config.ini");
+        OverlayConfig new_cfg;
+        config_set_defaults(&new_cfg);
+        config_save(&new_cfg, "/data/overlay/config.ini");
+        g_config = new_cfg;
         g_config_changed = true;
         LOG_INFO("Config reset to defaults via HTTP Web Settings!");
 
@@ -1399,15 +1417,54 @@ static void* web_server_worker(void* arg) {
             continue;
         }
 
-        // Set 2-second receive timeout on client socket
-        struct bsd_timeval tv = { 2, 0 };
+        // Set 3-second receive timeout on client socket
+        struct bsd_timeval tv = { 3, 0 };
         __syscall(SYS_setsockopt, cfd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-        char req_buf[4096];
-        memset(req_buf, 0, sizeof(req_buf));
-        long n = __syscall(SYS_read, cfd, req_buf, sizeof(req_buf) - 1);
-        if (n > 0) {
-            handle_client_http(cfd, req_buf, (size_t)n);
+        char req_buf[8192];
+        size_t total_read = 0;
+        int content_len = -1;
+        const char* body_start = nullptr;
+
+        while (total_read < sizeof(req_buf) - 1) {
+            long n = __syscall(SYS_read, cfd, req_buf + total_read, sizeof(req_buf) - 1 - total_read);
+            if (n <= 0) break;
+            total_read += n;
+            req_buf[total_read] = '\0';
+
+            if (!body_start) {
+                body_start = strstr(req_buf, "\r\n\r\n");
+                if (body_start) {
+                    body_start += 4;
+                    // Find Content-Length case-insensitively
+                    const char* p = req_buf;
+                    while (p && p < body_start) {
+                        if (strncasecmp(p, "Content-Length:", 15) == 0) {
+                            p += 15;
+                            while (*p == ' ' || *p == '\t') p++;
+                            content_len = atoi(p);
+                            break;
+                        }
+                        p = strchr(p, '\n');
+                        if (p) p++;
+                    }
+                    if (content_len < 0) {
+                        // No Content-Length (e.g. GET request)
+                        content_len = 0;
+                    }
+                }
+            }
+
+            if (body_start && content_len >= 0) {
+                size_t body_received = total_read - (size_t)(body_start - req_buf);
+                if (body_received >= (size_t)content_len) {
+                    break;
+                }
+            }
+        }
+
+        if (total_read > 0) {
+            handle_client_http(cfd, req_buf, total_read);
         }
 
         __syscall(SYS_close, cfd);

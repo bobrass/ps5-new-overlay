@@ -735,6 +735,9 @@ static float get_fps_reading(void) {
 
 static void* payload_thread_main(void* arg) {
     (void)arg;
+    // Allow SceShellUI threads to settle after ptrace detach before touching internal Mono state
+    usleep(300000); // 300ms safety stabilization delay
+
     const pid_t pid = getpid();
     LOG_INFO("PS5 Overlay Payload thread started in SceShellUI (PID: %d)", pid);
 
@@ -880,8 +883,11 @@ static void* payload_thread_main(void* arg) {
             return nullptr;
         }
 
-        MonoString* game_str = mono_string_new(Root_Domain, "Game");
-        void* scene_args[1] = { game_str };
+        static MonoString* s_game_str = nullptr;
+        if (!s_game_str) {
+            s_game_str = mono_string_new(Root_Domain, "Game");
+        }
+        void* scene_args[1] = { s_game_str };
         MonoObject* exc = nullptr;
         MonoObject* game_scene = mono_runtime_invoke(find_scene, nullptr, scene_args, &exc);
 

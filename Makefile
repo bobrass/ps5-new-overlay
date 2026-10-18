@@ -2,12 +2,12 @@
 # Builds the standalone PS5 Overlay (Payload + Injector) using ps5-payload-sdk
 
 ifndef PS5_PAYLOAD_SDK
-    ifneq ($(wildcard /opt/ps5-payload-sdk/toolchain/prospero.mk),)
-        PS5_PAYLOAD_SDK := /opt/ps5-payload-sdk
-    else ifneq ($(wildcard $(HOME)/ps5-payload-sdk/toolchain/prospero.mk),)
+    ifneq ($(wildcard $(HOME)/ps5-payload-sdk/toolchain/prospero.mk),)
         PS5_PAYLOAD_SDK := $(HOME)/ps5-payload-sdk
     else ifneq ($(wildcard /home/kus/ps5-payload-sdk/toolchain/prospero.mk),)
         PS5_PAYLOAD_SDK := /home/kus/ps5-payload-sdk
+    else ifneq ($(wildcard /opt/ps5-payload-sdk/toolchain/prospero.mk),)
+        PS5_PAYLOAD_SDK := /opt/ps5-payload-sdk
     endif
 endif
 
@@ -22,7 +22,7 @@ endif
 
 BIN_DIR     := bin
 PAYLOAD_ELF := $(BIN_DIR)/overlay_payload.elf
-VERSION     ?= v0.0.18
+VERSION     ?= v1.0.19
 LOADER_ELF  := $(BIN_DIR)/ps5-overlay-kus_$(VERSION).elf
 
 # Flags

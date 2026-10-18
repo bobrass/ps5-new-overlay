@@ -32,6 +32,7 @@ int main(int argc, char const* argv[]) {
     pid_t shellui_pid = find_process_by_name("SceShellUI");
     if (shellui_pid <= 0) {
         LOG_ERROR("Could not find SceShellUI process!");
+        restore_authid(orig_authid);
         notify_send("Overlay Error: SceShellUI not found!");
         return -1;
     }
@@ -39,11 +40,16 @@ int main(int argc, char const* argv[]) {
     LOG_INFO("Found SceShellUI PID: %d. Injecting overlay payload...", shellui_pid);
     if (!inject_elf_into_pid(shellui_pid, overlay_payload_start)) {
         LOG_ERROR("Failed to inject overlay payload into SceShellUI!");
+        restore_authid(orig_authid);
         notify_send("Overlay Error: Injection failed! Check /data/overlay/overlay.log");
         return -1;
     }
 
     LOG_INFO("Overlay successfully injected into SceShellUI!");
+    restore_authid(orig_authid);
+
+    // Give SceShellUI threads 300ms to settle after ptrace detach before sending notification IPC
+    usleep(300000);
     notify_send("PS5 Overlay Active! Web Settings: port 8585");
 
     return 0;
