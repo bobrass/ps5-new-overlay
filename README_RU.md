@@ -159,5 +159,3 @@ color = #00E5FF
 * Разработчикам **ps5-payload-sdk**
 * Проектам **ProsperoMgr** и **ps5-hwinfo** за реверс-инжиниринг и исследования сенсоров PlayStation 5 SoC APU
 * Команде **OnionHEN** за базовые наработки интеграции с Mono PUI
-
-```
