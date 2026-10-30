@@ -978,7 +978,12 @@ async function resetConfig() {
       showToast('Настройки сброшены по умолчанию!');
       return;
     }
-  } catch (err) {}
+    showToast('Ошибка сохранения: ' + res.status);
+    return;
+  } catch (err) {
+    showToast('Ошибка сети при сбросе');
+    return;
+  }
   currentConfig = {
     enabled: true,
     pos_v: 0,
@@ -1271,6 +1276,15 @@ static void parse_config_json(const char* json, OverlayConfig* cfg) {
 // ---------------------------------------------------------------------------
 // HTTP Request Dispatcher
 // ---------------------------------------------------------------------------
+static void send_config_save_error(long client_fd) {
+    const char resp[] = "HTTP/1.1 500 Internal Server Error\r\n"
+        "Content-Type: application/json\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Connection: close\r\n\r\n"
+        "{\"status\":\"error\",\"message\":\"Config could not be saved to disk\"}";
+    socket_send_all(client_fd, resp, sizeof(resp) - 1);
+}
+
 static void handle_client_http(long client_fd, const char* req, size_t req_len) {
     (void)req_len;
 
@@ -1308,14 +1322,21 @@ static void handle_client_http(long client_fd, const char* req, size_t req_len) 
 
     if (strncmp(req, "POST /api/config", 16) == 0) {
         const char* body = strstr(req, "\r\n\r\n");
-        if (body) {
+        if (body && body[4] != '\0') {
             body += 4;
             OverlayConfig new_cfg = g_config;
             parse_config_json(body, &new_cfg);
-            config_save(&new_cfg, "/data/overlay/config.ini");
+            if (!config_save(&new_cfg, "/data/overlay/config.ini")) {
+                send_config_save_error(client_fd);
+                return;
+            }
             g_config = new_cfg;
             g_config_changed = true;
             LOG_INFO("Config updated via HTTP Web Settings and marked dirty!");
+        } else {
+            const char resp[] = "HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{\"status\":\"error\",\"message\":\"Missing request body\"}";
+            socket_send_all(client_fd, resp, sizeof(resp) - 1);
+            return;
         }
 
         const char resp[] = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n{\"status\":\"ok\"}";
@@ -1326,7 +1347,10 @@ static void handle_client_http(long client_fd, const char* req, size_t req_len) 
     if (strncmp(req, "POST /api/reset", 15) == 0) {
         OverlayConfig new_cfg;
         config_set_defaults(&new_cfg);
-        config_save(&new_cfg, "/data/overlay/config.ini");
+        if (!config_save(&new_cfg, "/data/overlay/config.ini")) {
+            send_config_save_error(client_fd);
+            return;
+        }
         g_config = new_cfg;
         g_config_changed = true;
         LOG_INFO("Config reset to defaults via HTTP Web Settings!");

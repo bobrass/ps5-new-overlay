@@ -394,6 +394,37 @@ bool config_load(OverlayConfig* cfg, const char* path) {
     return true;
 }
 
+static bool config_write_file(const char* path, const char* buf, int len) {
+    long fd = __syscall(SYS_open, path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
+        LOG_ERROR("Failed to open %s for writing (fd=%ld)", path, fd);
+        return false;
+    }
+
+    int written = 0;
+    while (written < len) {
+        long count = __syscall(SYS_write, fd, buf + written, (size_t)(len - written));
+        if (count <= 0) {
+            LOG_ERROR("Failed to write %s at byte %d (result=%ld)", path, written, count);
+            __syscall(SYS_close, fd);
+            return false;
+        }
+        written += (int)count;
+    }
+
+    bool saved = true;
+    if (__syscall(SYS_fsync, fd) < 0) {
+        LOG_ERROR("Failed to sync %s", path);
+        saved = false;
+    }
+    if (__syscall(SYS_close, fd) < 0) {
+        LOG_ERROR("Failed to close %s after writing", path);
+        saved = false;
+    }
+    if (saved) LOG_INFO("Config saved successfully to %s", path);
+    return saved;
+}
+
 bool config_save(const OverlayConfig* cfg, const char* path) {
     if (!cfg || !path) return false;
 
@@ -454,26 +485,16 @@ bool config_save(const OverlayConfig* cfg, const char* path) {
         );
     }
 
-    long fd = __syscall(SYS_open, path, O_WRONLY | O_CREAT | O_TRUNC, 0666);
-    if (fd >= 0) {
-        __syscall(SYS_write, fd, buf, len);
-        __syscall(SYS_fsync, fd);
-        __syscall(SYS_close, fd);
-        LOG_INFO("Config saved successfully to %s", path);
-    } else {
-        LOG_ERROR("Failed to open %s for writing (fd=%ld)", path, fd);
-    }
+    bool target_saved = config_write_file(path, buf, len);
 
-    // Mirror to /data/ps5_overlay.ini as a guaranteed root fallback
+    // Keep the legacy root-level copy as a compatibility fallback.
+    bool legacy_saved = false;
     if (strcmp(path, "/data/ps5_overlay.ini") != 0) {
-        long mfd = __syscall(SYS_open, "/data/ps5_overlay.ini", O_WRONLY | O_CREAT | O_TRUNC, 0666);
-        if (mfd >= 0) {
-            __syscall(SYS_write, mfd, buf, len);
-            __syscall(SYS_fsync, mfd);
-            __syscall(SYS_close, mfd);
-            LOG_INFO("Config mirror backup saved to /data/ps5_overlay.ini");
-        }
+        legacy_saved = config_write_file("/data/ps5_overlay.ini", buf, len);
     }
 
-    return (fd >= 0);
+    if (!target_saved) {
+        LOG_ERROR("Requested config path %s could not be saved; legacy copy saved=%d", path, legacy_saved ? 1 : 0);
+    }
+    return target_saved;
 }
