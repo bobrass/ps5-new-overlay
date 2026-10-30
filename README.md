@@ -24,7 +24,7 @@ The overlay renders on top of any game and the `SceShellUI` system menu using na
   11. **PWR** — SoC APU power consumption in Watts (`sceKernelGetSocPowerConsumption`).
   12. **IP** — Local console IPv4 network address.
 
-- 🌐 **Built-in Web Control Panel (Port 8585)**:
+- 🌐 **Optional Built-in Web Control Panel (Port 8585)**:
   * Accessible from any device on your local network: `http://<PS5_IP>:8585`.
   * **Live Preview** of the HUD right in your browser window.
   * **Sorting & Filtering**: Enable/disable any metric and change display order using ▲ / ▼ buttons.
@@ -33,6 +33,7 @@ The overlay renders on top of any game and the `SceShellUI` system menu using na
   * **Appearance**: Customize font size, bar height, background color, and transparency.
   * 🛑 **Hot Unload**: Safe shutdown button to unload the overlay and free memory without rebooting the console.
   * **Auto-Save**: All changes are saved to `/data/overlay/config.ini` and automatically loaded on startup.
+  * **Optional**: Set `web_server_enabled = false` in the `[overlay]` section of `config.ini` to keep the telemetry overlay running without starting the HTTP server.
 
 - 🚀 **Standalone Loader (All-In-One ELF)**:
   * Single executable file `ps5-overlay-kus_vX.X.X.elf`.
@@ -136,6 +137,7 @@ bar_height = 34
 bg_visible = true
 bg_color = #000000
 bg_opacity = 0.70
+web_server_enabled = true
 port = 8585
 
 [metrics]
@@ -151,6 +153,8 @@ color = #00E5FF
 ...
 
 ```
+
+Set `web_server_enabled = false` to disable the HTTP server while leaving the overlay and telemetry active. The default is `true` for existing configurations. This setting is read from the file at startup.
 
 ---
 

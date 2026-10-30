@@ -37,6 +37,7 @@ struct OverlayConfig {
     char bg_hex_color[8];    // Default "#000000"
     float bg_r, bg_g, bg_b;
     float bg_opacity;        // Default 0.70f (range 0.0..1.0)
+    bool web_server_enabled; // Default true
     int web_port;            // Default 8585
 
     // Metric ordering and configurations

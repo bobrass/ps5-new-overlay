@@ -851,13 +851,17 @@ static void* payload_thread_main(void* arg) {
     // Load persistent config from /data/overlay/config.ini (or create default)
     config_load(&g_config, "/data/overlay/config.ini");
 
-    // Launch embedded HTTP web server on non-standard port (default 8585, configurable in config.ini)
-    int web_port = (g_config.web_port >= 1024 && g_config.web_port <= 65535) ? g_config.web_port : 8585;
-    if (g_bargs.pthread_create_addr) {
-        LOG_INFO("Starting embedded HTTP web settings server on port %d...", web_port);
-        web_server_start(web_port, g_bargs.pthread_create_addr);
+    // Launch the web server only when enabled; telemetry remains active without it.
+    if (g_config.web_server_enabled) {
+        int web_port = (g_config.web_port >= 1024 && g_config.web_port <= 65535) ? g_config.web_port : 8585;
+        if (g_bargs.pthread_create_addr) {
+            LOG_INFO("Starting embedded HTTP web settings server on port %d...", web_port);
+            web_server_start(web_port, g_bargs.pthread_create_addr);
+        } else {
+            LOG_WARN("pthread_create_addr is null; cannot start web server");
+        }
     } else {
-        LOG_WARN("pthread_create_addr is null; cannot start web server");
+        LOG_INFO("Embedded HTTP web settings server disabled by config");
     }
 
     LOG_INFO("Overlay ready! Entering continuous game monitoring loop in SceShellUI...");

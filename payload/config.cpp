@@ -116,6 +116,7 @@ void config_set_defaults(OverlayConfig* cfg) {
     cfg->bg_g = 0.0f;
     cfg->bg_b = 0.0f;
     cfg->bg_opacity = 0.70f;
+    cfg->web_server_enabled = true;
     cfg->web_port = 8585;
 
     // Default order: FPS, CPU, CPU_LOAD, GPU, RAM, VRAM, FAN, IP
@@ -312,6 +313,8 @@ bool config_load(OverlayConfig* cfg, const char* path) {
                 float op = parse_float(val, cfg->bg_opacity);
                 if (op > 1.0f) op /= 100.0f;
                 if (op >= 0.0f && op <= 1.0f) cfg->bg_opacity = op;
+            } else if (ci_streq(key, "web_server_enabled")) {
+                cfg->web_server_enabled = parse_bool(val, cfg->web_server_enabled);
             } else if (ci_streq(key, "port") || ci_streq(key, "web_port")) {
                 int p = parse_int(val, cfg->web_port);
                 if (p >= 1024 && p <= 65535) cfg->web_port = p;
@@ -419,6 +422,7 @@ bool config_save(const OverlayConfig* cfg, const char* path) {
         "bg_visible = %s\n"
         "bg_color = %s\n"
         "bg_opacity = %.2f\n"
+        "web_server_enabled = %s\n"
         "port = %d\n\n"
         "[metrics]\n"
         "order = ",
@@ -432,6 +436,7 @@ bool config_save(const OverlayConfig* cfg, const char* path) {
         cfg->bg_visible ? "true" : "false",
         cfg->bg_hex_color,
         cfg->bg_opacity,
+        cfg->web_server_enabled ? "true" : "false",
         cfg->web_port
     );
 
